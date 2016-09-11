@@ -1,0 +1,7 @@
+﻿{
+  "MailChimp": {
+    "apiKey": "a132cd50bae52b17f8b174a5f300bdc9-us14",
+    "userName": "yonas_k",
+    "endPointRootURL": "https://us14.api.mailchimp.com/3.0"
+  }
+}
