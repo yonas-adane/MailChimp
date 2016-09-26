@@ -1,17 +1,24 @@
-﻿using Microsoft.Framework.Configuration;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using System.Configuration;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System.IO;
+using ICSharpCode.SharpZipLib.GZip;
+using ICSharpCode.SharpZipLib.Tar;
+using ICSharpCode.SharpZipLib.Core;
+using System.Net;
+using ICSharpCode.SharpZipLib.Zip;
 
-namespace MailChimp
+namespace MailChimp_Batch
 {
-    public class Program
+    class Program
     {
+
         public string credentials = string.Empty;
         public string endPointRootURL = string.Empty;
         public string apiKey = string.Empty;
@@ -20,9 +27,6 @@ namespace MailChimp
 
         public Program()
         {
-
-            var builder = new ConfigurationBuilder()
-                     .AddJsonFile("config.json");
             /*
              * structure of the config.json file
              *
@@ -36,15 +40,14 @@ namespace MailChimp
              *
              */
 
-            var configuration = builder.Build();
-            endPointRootURL = configuration["MailChimp:endPointRootURL"];
-            apiKey = configuration["MailChimp:apiKey"];
-            userName = configuration["MailChimp:userName"];
+            endPointRootURL = ConfigurationManager.AppSettings.Get("endPointRootURL");
+            apiKey = ConfigurationManager.AppSettings.Get("apiKey");
+            userName = ConfigurationManager.AppSettings.Get("userName");
 
             client = new HttpClient();
             client.BaseAddress = new Uri(endPointRootURL);
             //credentials = Convert.ToBase64String(Encoding.ASCII.GetBytes("" + userName +":"+ apiKey ));
-            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue ("Basic" , apiKey);
+            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", apiKey);
         }
 
         public static void Main(string[] args)
@@ -57,7 +60,7 @@ namespace MailChimp
             try
             {
 
-                
+
 
 
 
@@ -77,7 +80,7 @@ namespace MailChimp
                     {
                         method = "GET",
                         path = "lists/" + l.id + "/members",
-                        operation_id = l.id + "000",
+                        //operation_id = l.id,
                         body = "",
                         @params = ""
                     });
@@ -85,8 +88,8 @@ namespace MailChimp
                 }
 
                 //issue a batch operation request 
-                Task<string> batchResponse = p.requestBatchOperation(p.client, req);
-                var batchResult = batchResponse.Result;
+                //Task<string> batchResponse = p.requestBatchOperation(p.client, req);
+                //var batchResult = batchResponse.Result;
 
 
                 //check the status of batches
@@ -100,10 +103,15 @@ namespace MailChimp
                 Console.WriteLine(tableRowFormat, "id", "status", "total", "finished", "errored", "completed", "response_body_url");
                 foreach (var item in batchCheckResult.batches)
                 {
-                    Console.WriteLine(tableRowFormat, 
+                    Console.WriteLine(tableRowFormat,
                         item.id, item.status, item.total_operations, item.finished_operations, item.errored_operations, item.completed_at, String.IsNullOrEmpty(item.response_body_url) ? "" : item.response_body_url + "...");
-                }
 
+                    Task<string> extracted = p.ExtractGZipSample(item.id,item.response_body_url);
+                    string extractedVal = extracted.Result;
+
+                    p.readMemberList(extractedVal);
+
+                }
 
 
 
@@ -112,8 +120,63 @@ namespace MailChimp
             {
                 Console.WriteLine(ex.Message);
             }
-           
 
+
+
+        }
+
+
+        public async Task<string> ExtractGZipSample(string batchId, string requestUri)
+        {
+
+            try
+            {
+                HttpClient webClient = new HttpClient();
+                byte[] urlContents = await webClient.GetByteArrayAsync(requestUri);
+
+                Stream stream = new MemoryStream(urlContents);
+                GZipInputStream gzipStream = new GZipInputStream(stream);
+
+                TarArchive tarArchive = TarArchive.CreateInputTarArchive(gzipStream);
+
+                String tempFolderPath = Environment.GetEnvironmentVariable("TEMP");
+                string extractFolderPath = tempFolderPath + @"\" + batchId + @"\";
+
+                //when extracting, if path already exists, it will be overwritten.
+                tarArchive.ExtractContents(extractFolderPath);
+                tarArchive.Close();
+                gzipStream.Close();
+                stream.Close();
+
+                return extractFolderPath;
+
+            }
+            catch 
+            {
+                throw;
+            }
+
+                
+        }
+
+        public void readMemberList(string extractFolderPath)
+        {
+
+            //loop over each file and read content of each json file.
+            foreach (var file in Directory.EnumerateFiles(extractFolderPath))
+            {
+
+                memberResponse[] response = JsonConvert.DeserializeObject<memberResponse[]>(File.ReadAllText(file));
+
+                memberRoot members = JsonConvert.DeserializeObject<memberRoot>(response[0].response);
+
+                //use http://json2csharp.com/ to create classes from json script
+
+                foreach(var member in members.members)
+                {
+                    Console.WriteLine("| {0,-10} | {1,-40} | {2,-20} |", member.list_id, member.email_address, member.timestamp_opt);
+                }
+            }
 
         }
 
@@ -157,7 +220,7 @@ namespace MailChimp
                             {
                                 method = b.method,
                                 path = b.path,
-                                operation_id =  b.operation_id 
+                                operation_id = b.operation_id
                             }
                 });
 
@@ -180,6 +243,94 @@ namespace MailChimp
             return batch;
         }
 
+        public void ExtractTGZ(String gzArchiveName, String destFolder)
+        {
+
+            Stream inStream = File.OpenRead(gzArchiveName);
+            Stream gzipStream = new GZipInputStream(inStream);
+
+            TarArchive tarArchive = TarArchive.CreateInputTarArchive(gzipStream);
+            tarArchive.ExtractContents(destFolder);
+            tarArchive.Close();
+
+            gzipStream.Close();
+            inStream.Close();
+        }
+
+        public class memberResponse
+        {
+            public string status_code { get; set; }
+            public string operation_id { get; set; }
+            public string response { get; set; }
+        }
+
+
+        //-------------------------------
+
+
+        public class MergeFields
+        {
+            public string FNAME { get; set; }
+            public string LNAME { get; set; }
+            public string MMERGE3 { get; set; }
+            public string MMERGE4 { get; set; }
+        }
+
+        public class Stats
+        {
+            public int avg_open_rate { get; set; }
+            public int avg_click_rate { get; set; }
+        }
+
+        public class Location
+        {
+            public int latitude { get; set; }
+            public int longitude { get; set; }
+            public int gmtoff { get; set; }
+            public int dstoff { get; set; }
+            public string country_code { get; set; }
+            public string timezone { get; set; }
+        }
+
+        public class Link
+        {
+            public string rel { get; set; }
+            public string href { get; set; }
+            public string method { get; set; }
+            public string targetSchema { get; set; }
+            public string schema { get; set; }
+        }
+
+        public class member
+        {
+            public string id { get; set; }
+            public string email_address { get; set; }
+            public string unique_email_id { get; set; }
+            public string email_type { get; set; }
+            public string status { get; set; }
+            public MergeFields merge_fields { get; set; }
+            public Stats stats { get; set; }
+            public string ip_signup { get; set; }
+            public string timestamp_signup { get; set; }
+            public string ip_opt { get; set; }
+            public string timestamp_opt { get; set; }
+            public int member_rating { get; set; }
+            public string last_changed { get; set; }
+            public string language { get; set; }
+            public bool vip { get; set; }
+            public string email_client { get; set; }
+            public Location location { get; set; }
+            public string list_id { get; set; }
+            public List<Link> _links { get; set; }
+        }
+
+        public class memberRoot
+        {
+            public List<member> members { get; set; }
+        }
+
+        //-------------------------------
+
         public class listsResponse
         {
             public List<list> lists { get; set; }
@@ -191,23 +342,23 @@ namespace MailChimp
             public string id { get; set; }
             public string name { get; set; }
         }
-        
+
         public class batchRequest
         {
             //method and path are required
-           public string method { get; set; }
-           public string path { get; set; } //The relative path of the operation
-           
-           public string operation_id { get; set; } //A string you provide that identifies the operation
-           public string @params { get; set; } //Any URL params, only used for GET 
-           public string body { get; set; } //The JSON payload for PUT, POST, or PATCH
+            public string method { get; set; }
+            public string path { get; set; } //The relative path of the operation
+
+            public string operation_id { get; set; } //A string you provide that identifies the operation
+            public string @params { get; set; } //Any URL params, only used for GET 
+            public string body { get; set; } //The JSON payload for PUT, POST, or PATCH
 
         }
 
         public class batchResponse
         {
             public List<batch> batches { get; set; }
-            public int total_items { get;  set;}
+            public int total_items { get; set; }
         }
 
         //for more detail on the fields below,
