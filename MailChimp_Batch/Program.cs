@@ -1,18 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http;
 using System.Text;
-using System.Threading.Tasks;
 using System.Configuration;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.IO;
 using ICSharpCode.SharpZipLib.GZip;
 using ICSharpCode.SharpZipLib.Tar;
-using ICSharpCode.SharpZipLib.Core;
 using System.Net;
-using ICSharpCode.SharpZipLib.Zip;
+using MailChimp_Batch.Models;
 
 namespace MailChimp_Batch
 {
@@ -20,119 +17,194 @@ namespace MailChimp_Batch
     {
 
         public string credentials = string.Empty;
-        public string endPointRootURL = string.Empty;
+        public string endPointRootUrl = string.Empty;
         public string apiKey = string.Empty;
         public string userName = string.Empty;
-        public HttpClient client = null; //this can be WebClient if project is not based on .net core
+        public WebClient client = null;
 
+        //default constructor for initalizing variables.
         public Program()
         {
-            /*
-             * structure of the config.json file
-             *
-             * {
-             *     "MailChimp": {
-             *       "apiKey": "API_KEY",
-             *       "userName": "USERNAME",
-             *       "endPointRootURL": "ENDPOINT_URL"
-             *     }
-             * }
-             *
-             */
-
-            endPointRootURL = ConfigurationManager.AppSettings.Get("endPointRootURL");
+            //info for connecting to the api
+            endPointRootUrl = ConfigurationManager.AppSettings.Get("endPointRootURL");
             apiKey = ConfigurationManager.AppSettings.Get("apiKey");
             userName = ConfigurationManager.AppSettings.Get("userName");
 
-            client = new HttpClient();
-            client.BaseAddress = new Uri(endPointRootURL);
-            //credentials = Convert.ToBase64String(Encoding.ASCII.GetBytes("" + userName +":"+ apiKey ));
-            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", apiKey);
+            //send credentials to get authorized to access the api.
+            client = new WebClient();
+            credentials = Convert.ToBase64String(Encoding.ASCII.GetBytes("" + userName +":"+ apiKey ));
+            client.Headers[HttpRequestHeader.Authorization] = string.Format("Basic {0}", credentials);
+
         }
 
         public static void Main(string[] args)
         {
 
-            Program p = new Program();
-
-
-
             try
             {
 
+                Program p = new Program();
 
+                //get list of lists
+                List<List> lists = p.getList().lists;
 
+                //for lists already in the exclude file, don't issue a batch operation request
+                //NOTE: the file "Exclude.json" is located in the bin\debug folder.
+                string fileContent = File.ReadAllText(@"Exclude.json");
 
+                List<Batch> excludeList = new List<Batch> ();
+                List<List> requestBatch = new List<List> ();
 
-
-                Task<listsResponse> lists = p.getLists(p.client);
-                var listsResponse = lists.Result;
-                List<batchRequest> req = new List<batchRequest>();
-
-                /*
-                 * Now loop over the list. 
-                 * And issue a batch request to get members for each list.
-                 */
-                foreach (list l in listsResponse.lists)
+                if (fileContent.Length > 0)
                 {
+                    excludeList = JArray.Parse(fileContent).ToObject<List<Batch>>();
 
-                    req.Add(new batchRequest
+                     requestBatch = (from l in lists
+                                       join e in excludeList
+                                       on l.id equals e.listId
+                                       into le //left join list with the exclusion list
+                                       from b in le.DefaultIfEmpty()
+                                       where (b == null) //only pull lists with no batch id
+                                       select l).ToList<List>();
+                }
+                else
+                {
+                    requestBatch = (from l in lists
+                                    select l).ToList<List>();
+                }
+
+                //issue a batch request operation 
+                foreach (var l in requestBatch)
+                {
+                    Batch batch = p.postBatch("/lists/" + l.id + "/members");
+                    batch.listId = l.id;
+
+                    //once batch operation request is posted, add list to the exclusion list.
+                    excludeList.Add(batch);
+                }
+
+                //Update exclusion list file.
+                File.WriteAllText(@"Exclude.json", JsonConvert.SerializeObject(excludeList));
+
+                //check the status of batch operations
+                //if completed (status == completed and errored_operations = 0) 
+                //download file, untarr and unzip file. 
+                //then update the CRM.
+
+                //reload exclusion list
+                excludeList = JArray.Parse(File.ReadAllText(@"Exclude.json")).ToObject<List<Batch>>();
+
+                //ready list contains list of batches ready to be downloade/extracted
+                //Note: once the data is downloaded and extracted, it'll be removed from the exclusion list
+                List<Batch> readyList = new List<Batch>(excludeList);
+
+                //loop through the exclusion list and see if we've batches ready for download.
+                foreach (var e in readyList)
+                {
+                    string downloadUrl = p.getDownloadUrl(e.id);
+
+                    if (downloadUrl.Length > 0)
                     {
-                        method = "GET",
-                        path = "lists/" + l.id + "/members",
-                        //operation_id = l.id,
-                        body = "",
-                        @params = ""
-                    });
+                        //download file
+                        string extractFolder = p.extractFile(e.id, downloadUrl);
+
+                        //display downloaded list (Optional)
+                        p.getMemberList(extractFolder);
+
+                        //update CRM list.
+                        //Call the CRM's API to proceed working on the downloaded list.
+
+                        //once the CRM task is done, update the exclude list so 
+                        //that we can download the list again in the future 
+                        //(member lists constantly change).
+                        excludeList.Remove(e);
+
+                        //write the updated list back to the file.
+                        File.WriteAllText(@"Exclude.json", JsonConvert.SerializeObject(excludeList));
+
+                    }
+
 
                 }
-
-                //issue a batch operation request 
-                //Task<string> batchResponse = p.requestBatchOperation(p.client, req);
-                //var batchResult = batchResponse.Result;
-
-
-                //check the status of batches
-                Task<batchResponse> batchCheckResponse = p.checkBatchStatus(p.client);
-                batchResponse batchCheckResult = batchCheckResponse.Result;
-
-                //display result
-                //print header
-                //-ve spacing: left aligned
-                string tableRowFormat = "| {0,-10} | {1,-10} | {2, 8} | {3,8} | {4,8} | {5,-25} | {6,-53} |";
-                Console.WriteLine(tableRowFormat, "id", "status", "total", "finished", "errored", "completed", "response_body_url");
-                foreach (var item in batchCheckResult.batches)
-                {
-                    Console.WriteLine(tableRowFormat,
-                        item.id, item.status, item.total_operations, item.finished_operations, item.errored_operations, item.completed_at, String.IsNullOrEmpty(item.response_body_url) ? "" : item.response_body_url + "...");
-
-                    Task<string> extracted = p.ExtractGZipSample(item.id,item.response_body_url);
-                    string extractedVal = extracted.Result;
-
-                    p.readMemberList(extractedVal);
-
-                }
-
-
 
             }
-            catch (Exception ex)
+            catch(Exception ex)
             {
                 Console.WriteLine(ex.Message);
             }
 
-
-
+            Console.WriteLine("All done!");
+            Console.Read();
         }
 
 
-        public async Task<string> ExtractGZipSample(string batchId, string requestUri)
+        /// <summary>
+        /// Get information about all lists
+        /// </summary>
+        /// <returns></returns>
+        public ListResponse getList()
+        {
+            /*
+            * Use the /lists?count=[NUMBER_OF_LISTS_TO_GET] to set a limit on number of lists returned. 
+           * By expiriment, maximum number of count is 100.
+           * To iterate over a large number of lists, use the offset parameter.
+           * For really large number of lists, you may need to use a batch request. 
+           */
+            var response = client.DownloadString(endPointRootUrl + "/lists");
+
+            ListResponse lists = JsonConvert.DeserializeObject<ListResponse>(response);  //convert the json in the response object into a list.
+
+            return lists;
+        }
+
+        /// <summary>
+        /// Begin processing a batch operations request.
+        /// </summary>
+        public Batch postBatch(string path)
+        {
+
+            //build payload string
+            string payload = String.Format(@"{{""operations"": [{{""method"": ""GET"", ""path"": ""{0}""}} ]}}",path);
+
+            var response = client.UploadString(endPointRootUrl + "/batches", payload);
+
+            Batch batch = JsonConvert.DeserializeObject<Batch>(response);
+
+            return batch;
+
+        }
+
+        /// <summary>
+        /// Checkes if a batch operation is completed
+        /// </summary>
+        /// <returns>The Url to download the data file</returns>
+        public string getDownloadUrl(string batchId)
+        {
+            var response = client.DownloadString(endPointRootUrl + "/batches/" + batchId);
+
+            Batch batch = JsonConvert.DeserializeObject<Batch>(response);
+
+            if (batch.errored_operations == 0 && batch.status == "finished")
+                return batch.response_body_url;
+            else
+                return string.Empty;
+
+        }
+
+        
+        /// <summary>
+        /// Downloads the datafile and extracts its contents
+        /// </summary>
+        /// <param name="batchId">The id of the batch. Used for naming the folder where the files will be extracted</param>
+        /// <param name="requestUri">The url to download the data file</param>
+        /// <returns>The path to the folder where the extracted data files are located</returns>
+        public string extractFile(string batchId, string requestUri)
         {
 
             try
             {
-                HttpClient webClient = new HttpClient();
-                byte[] urlContents = await webClient.GetByteArrayAsync(requestUri);
+                WebClient downloadClient = new WebClient();
+                byte[] urlContents = downloadClient.DownloadData(requestUri);
 
                 Stream stream = new MemoryStream(urlContents);
                 GZipInputStream gzipStream = new GZipInputStream(stream);
@@ -159,18 +231,21 @@ namespace MailChimp_Batch
                 
         }
 
-        public void readMemberList(string extractFolderPath)
+
+        /// <summary>
+        /// Gets member list
+        /// </summary>
+        /// <param name="extractFolderPath">The path to the folder where data files are extracted.</param>
+        public void getMemberList(string extractFolderPath)
         {
 
             //loop over each file and read content of each json file.
             foreach (var file in Directory.EnumerateFiles(extractFolderPath))
             {
 
-                memberResponse[] response = JsonConvert.DeserializeObject<memberResponse[]>(File.ReadAllText(file));
+                MemberResponse[] response = JsonConvert.DeserializeObject<MemberResponse[]>(File.ReadAllText(file));
 
-                memberRoot members = JsonConvert.DeserializeObject<memberRoot>(response[0].response);
-
-                //use http://json2csharp.com/ to create classes from json script
+                Members members = JsonConvert.DeserializeObject<Members>(response[0].response);
 
                 foreach(var member in members.members)
                 {
@@ -179,201 +254,7 @@ namespace MailChimp_Batch
             }
 
         }
-
-        /// <summary>
-        /// Gets list of mailchimp lists collection 
-        /// </summary>
-        /// <param name="client"></param>
-        /// <returns></returns>
-        public async Task<listsResponse> getLists(HttpClient client)
-        {
-            /*
-             * Use the /lists?count=[NUMBER_OF_LISTS_TO_GET] to set a limit on number of lists returned. 
-            * By expiriment, maximum number of count is 100.
-            * To iterate over a large number of lists, use the offset parameter.
-            * For really large number of lists, you may need to use a batch request. 
-            */
-            var response = await client.GetAsync(endPointRootURL + "/lists");
-            var contents = await response.Content.ReadAsStringAsync();
-
-            /*
-             * Structure of lists
-             * listsResponse (a single response object that contains an overall info of the list collection. like number of lists)
-             * -list (this is the actual list of lists collection). 
-             */
-            listsResponse lists = JsonConvert.DeserializeObject<listsResponse>(contents);  //convert the json in the response object into a list.
-
-            return lists;
-        }
-
-        public async Task<string> requestBatchOperation(HttpClient client, List<batchRequest> request)
-        {
-            //build batch operation request json string
-            //for full details on other options to include in the string
-            //refer to mailchimp Batch Operations guide
-            JObject payload = JObject.FromObject(
-                new
-                {
-                    operations =
-                            from b in request
-                            select new
-                            {
-                                method = b.method,
-                                path = b.path,
-                                operation_id = b.operation_id
-                            }
-                });
-
-            var content = new StringContent(payload.ToString(), Encoding.UTF8, "application/json");
-
-            var result = await client.PostAsync(client.BaseAddress + "/batches", content);
-
-            return result.ToString();
-
-        }
-
-        public async Task<batchResponse> checkBatchStatus(HttpClient client)
-        {
-
-            var response = await client.GetAsync(client.BaseAddress + "/batches?count=100");
-            var contents = await response.Content.ReadAsStringAsync();
-
-            batchResponse batch = JsonConvert.DeserializeObject<batchResponse>(contents);  //convert the json in the response object into a list.
-
-            return batch;
-        }
-
-        public void ExtractTGZ(String gzArchiveName, String destFolder)
-        {
-
-            Stream inStream = File.OpenRead(gzArchiveName);
-            Stream gzipStream = new GZipInputStream(inStream);
-
-            TarArchive tarArchive = TarArchive.CreateInputTarArchive(gzipStream);
-            tarArchive.ExtractContents(destFolder);
-            tarArchive.Close();
-
-            gzipStream.Close();
-            inStream.Close();
-        }
-
-        public class memberResponse
-        {
-            public string status_code { get; set; }
-            public string operation_id { get; set; }
-            public string response { get; set; }
-        }
-
-
-        //-------------------------------
-
-
-        public class MergeFields
-        {
-            public string FNAME { get; set; }
-            public string LNAME { get; set; }
-            public string MMERGE3 { get; set; }
-            public string MMERGE4 { get; set; }
-        }
-
-        public class Stats
-        {
-            public int avg_open_rate { get; set; }
-            public int avg_click_rate { get; set; }
-        }
-
-        public class Location
-        {
-            public int latitude { get; set; }
-            public int longitude { get; set; }
-            public int gmtoff { get; set; }
-            public int dstoff { get; set; }
-            public string country_code { get; set; }
-            public string timezone { get; set; }
-        }
-
-        public class Link
-        {
-            public string rel { get; set; }
-            public string href { get; set; }
-            public string method { get; set; }
-            public string targetSchema { get; set; }
-            public string schema { get; set; }
-        }
-
-        public class member
-        {
-            public string id { get; set; }
-            public string email_address { get; set; }
-            public string unique_email_id { get; set; }
-            public string email_type { get; set; }
-            public string status { get; set; }
-            public MergeFields merge_fields { get; set; }
-            public Stats stats { get; set; }
-            public string ip_signup { get; set; }
-            public string timestamp_signup { get; set; }
-            public string ip_opt { get; set; }
-            public string timestamp_opt { get; set; }
-            public int member_rating { get; set; }
-            public string last_changed { get; set; }
-            public string language { get; set; }
-            public bool vip { get; set; }
-            public string email_client { get; set; }
-            public Location location { get; set; }
-            public string list_id { get; set; }
-            public List<Link> _links { get; set; }
-        }
-
-        public class memberRoot
-        {
-            public List<member> members { get; set; }
-        }
-
-        //-------------------------------
-
-        public class listsResponse
-        {
-            public List<list> lists { get; set; }
-            public int total_items { get; set; }
-        }
-
-        public class list
-        {
-            public string id { get; set; }
-            public string name { get; set; }
-        }
-
-        public class batchRequest
-        {
-            //method and path are required
-            public string method { get; set; }
-            public string path { get; set; } //The relative path of the operation
-
-            public string operation_id { get; set; } //A string you provide that identifies the operation
-            public string @params { get; set; } //Any URL params, only used for GET 
-            public string body { get; set; } //The JSON payload for PUT, POST, or PATCH
-
-        }
-
-        public class batchResponse
-        {
-            public List<batch> batches { get; set; }
-            public int total_items { get; set; }
-        }
-
-        //for more detail on the fields below,
-        //go to: http://developer.mailchimp.com/documentation/mailchimp/reference/batches/
-        public class batch
-        {
-            public string id { get; set; }
-            public string status { get; set; }
-            public int total_operations { get; set; }
-            public int finished_operations { get; set; }
-            public int errored_operations { get; set; }
-            public string submitted_at { get; set; }
-            public string completed_at { get; set; }
-            public string response_body_url { get; set; }
-        }
+             
 
 
     }
