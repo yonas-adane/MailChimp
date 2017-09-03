@@ -4,7 +4,7 @@
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
 #config file
-/appsettings.json
+/MailChimp/appsettings.json
 
 # User-specific files
 *.suo
