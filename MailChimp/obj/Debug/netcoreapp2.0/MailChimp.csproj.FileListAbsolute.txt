@@ -1,0 +1,11 @@
+C:\Documents\Visual Studio 2017\Projects\MailChimp\MailChimp\bin\Debug\netcoreapp2.0\MailChimp.deps.json
+C:\Documents\Visual Studio 2017\Projects\MailChimp\MailChimp\bin\Debug\netcoreapp2.0\MailChimp.runtimeconfig.json
+C:\Documents\Visual Studio 2017\Projects\MailChimp\MailChimp\bin\Debug\netcoreapp2.0\MailChimp.runtimeconfig.dev.json
+C:\Documents\Visual Studio 2017\Projects\MailChimp\MailChimp\bin\Debug\netcoreapp2.0\MailChimp.dll
+C:\Documents\Visual Studio 2017\Projects\MailChimp\MailChimp\bin\Debug\netcoreapp2.0\MailChimp.pdb
+C:\Documents\Visual Studio 2017\Projects\MailChimp\MailChimp\obj\Debug\netcoreapp2.0\MailChimp.csprojResolveAssemblyReference.cache
+C:\Documents\Visual Studio 2017\Projects\MailChimp\MailChimp\obj\Debug\netcoreapp2.0\MailChimp.csproj.CoreCompileInputs.cache
+C:\Documents\Visual Studio 2017\Projects\MailChimp\MailChimp\obj\Debug\netcoreapp2.0\MailChimp.AssemblyInfoInputs.cache
+C:\Documents\Visual Studio 2017\Projects\MailChimp\MailChimp\obj\Debug\netcoreapp2.0\MailChimp.AssemblyInfo.cs
+C:\Documents\Visual Studio 2017\Projects\MailChimp\MailChimp\obj\Debug\netcoreapp2.0\MailChimp.dll
+C:\Documents\Visual Studio 2017\Projects\MailChimp\MailChimp\obj\Debug\netcoreapp2.0\MailChimp.pdb

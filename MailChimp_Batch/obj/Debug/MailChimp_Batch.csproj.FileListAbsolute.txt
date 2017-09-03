@@ -1,9 +1,0 @@
-C:\Projects\MailChimp\MailChimp_Batch\bin\Debug\MailChimp_Batch.exe.config
-C:\Projects\MailChimp\MailChimp_Batch\bin\Debug\MailChimp_Batch.exe
-C:\Projects\MailChimp\MailChimp_Batch\bin\Debug\MailChimp_Batch.pdb
-C:\Projects\MailChimp\MailChimp_Batch\bin\Debug\Newtonsoft.Json.dll
-C:\Projects\MailChimp\MailChimp_Batch\bin\Debug\Newtonsoft.Json.xml
-C:\Projects\MailChimp\MailChimp_Batch\obj\Debug\MailChimp_Batch.exe
-C:\Projects\MailChimp\MailChimp_Batch\obj\Debug\MailChimp_Batch.pdb
-C:\Projects\MailChimp\MailChimp_Batch\bin\Debug\ICSharpCode.SharpZipLib.dll
-C:\Projects\MailChimp\MailChimp_Batch\obj\Debug\MailChimp_Batch.csprojResolveAssemblyReference.cache

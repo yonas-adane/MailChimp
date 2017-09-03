@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+# Visual Studio 15
+VisualStudioVersion = 15.0.26403.3
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MailChimp_Batch", "MailChimp_Batch\MailChimp_Batch.csproj", "{555CD520-D9F8-4F4F-93A7-8A5AAF43818E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MailChimp", "MailChimp\MailChimp.csproj", "{FE88C672-8AD8-4D4C-850B-5E95F3B6B648}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,10 +11,10 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{555CD520-D9F8-4F4F-93A7-8A5AAF43818E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{555CD520-D9F8-4F4F-93A7-8A5AAF43818E}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{555CD520-D9F8-4F4F-93A7-8A5AAF43818E}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{555CD520-D9F8-4F4F-93A7-8A5AAF43818E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FE88C672-8AD8-4D4C-850B-5E95F3B6B648}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FE88C672-8AD8-4D4C-850B-5E95F3B6B648}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FE88C672-8AD8-4D4C-850B-5E95F3B6B648}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FE88C672-8AD8-4D4C-850B-5E95F3B6B648}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
