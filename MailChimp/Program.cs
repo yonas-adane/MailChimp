@@ -18,17 +18,17 @@ namespace MailChimp
         {
 
             //Get instance of WebClient and appSettings
-            var app = ConfigurationBase.Instance;
+            ConfigurationBase configuration = ConfigurationBase.Instance;
 
             //Start batch services
-            BatchService batchService = new BatchService(app.httpClient, app.appSettings);
+            BatchService batchService = new BatchService(configuration);
 
             //Get list of batch status
             //to list all batch statuses, set GetStatus(true);
             Batch<BatchStatus> batchStatusList = batchService.GetStatus();
 
-            //Get a single batch status
-            BatchStatus batchStatus = batchService.GetStatus("000b63a08a");
+            //Get status for single batch
+            BatchStatus batchStatus = batchService.GetStatus("111b63c08b");
 
         }
     }

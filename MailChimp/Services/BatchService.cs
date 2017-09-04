@@ -20,11 +20,11 @@ namespace MailChimp.Services
         //the default max number of rows returned by the batch api
         private static int DEFAULT_MAX_COUNT_PER_PAGE = 100;
 
-        public BatchService(HttpClient httpClient, AppSettings appSettings)
+        public BatchService(ConfigurationBase configuration)
         {
-            this.httpClient = httpClient;
+            this.httpClient = configuration.httpClient;
 
-            this.appSettings = appSettings;
+            this.appSettings = configuration.appSettings;
 
             batchApiUri = new Uri(string.Concat(httpClient.BaseAddress, appSettings.Batches));
 

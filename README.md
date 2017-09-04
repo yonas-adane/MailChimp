@@ -10,10 +10,10 @@ Below is a sample code to show the usage of this project. I'll add support for m
         static void Main(string[] args)
         {
             //Get instance of WebClient and appSettings
-            var app = ConfigurationBase.Instance;
+            ConfigurationBase configuration = ConfigurationBase.Instance;
 
             //Start batch services
-            BatchService batchService = new BatchService(app.httpClient, app.appSettings);
+            BatchService batchService = new BatchService(configuration);
 
             //Get list of batch status
             //to list all batch statuses, set GetStatus(true);
