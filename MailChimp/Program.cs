@@ -21,14 +21,32 @@ namespace MailChimp
             ConfigurationBase configuration = ConfigurationBase.Instance;
 
             //Start batch services
-            BatchService batchService = new BatchService(configuration);
+            BatchService<BatchStatus> batchService = new BatchService<BatchStatus>(configuration);
 
             //Get list of batch status
             //to list all batch statuses, set GetStatus(true);
-            Batch<BatchStatus> batchStatusList = batchService.GetStatus();
+            var batchStatusList = batchService.GetStatus();
 
             //Get status for single batch
-            BatchStatus batchStatus = batchService.GetStatus("111b63c08b");
+            var batchStatus = batchService.GetStatus("111b63c08b");
+
+            //Start report services
+            ReportService<Campaign> reportService = new ReportService<Campaign>(configuration);
+
+            //Get list of reports
+            var reportList = reportService.GetReport();
+
+            //Get report of signle campaign
+            var report = reportService.GetReport("eaaf0b3b623");
+
+            //Get Sent-To report for a campaign
+            var sentToReport = reportService.GetSentTo("eaaf0b3b623");
+
+            //Get the full list of campaign receipients using batch operation
+            //Issue a batch request
+            //Check status
+            //Download and process file
+
 
         }
     }

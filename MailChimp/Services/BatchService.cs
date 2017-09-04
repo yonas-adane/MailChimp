@@ -9,7 +9,7 @@ using System.Text;
 
 namespace MailChimp.Services
 {
-    public class BatchService : IBatchService
+    public class BatchService<T> : IBatchService<T>
     {
         private HttpClient httpClient = null;
 
@@ -36,13 +36,13 @@ namespace MailChimp.Services
         /// <param name="includeAll">Optional: default false - maximum number of rows is limited by the DEFAULT_MAX_COUNT_PER_PAGE property. 
         /// if set to true all rows will be included in the list - slower if list is large</param>
         /// <returns></returns>
-        public Batch<BatchStatus> GetStatus(bool includeAll = false)
+        public Batch<T> GetStatus(bool includeAll = false)
         {
             int offset = 0;
 
             var result = httpClient.GetAsync(string.Concat(batchApiUri, string.Concat("?offset=", offset, "&count=", DEFAULT_MAX_COUNT_PER_PAGE))).Result.Content.ReadAsStringAsync().Result;
 
-            Batch<BatchStatus> batchStatusList = JObject.Parse(result).ToObject<Batch<BatchStatus>>();
+            Batch<T> batchStatusList = JObject.Parse(result).ToObject<Batch<T>>();
 
             //if user requested all rows proceed pulling all rows.
             if (includeAll)
@@ -60,7 +60,7 @@ namespace MailChimp.Services
                         var pagedResult = httpClient.GetAsync(string.Concat(batchApiUri, string.Concat("?offset=", offset, "&count=", DEFAULT_MAX_COUNT_PER_PAGE))).Result.Content.ReadAsStringAsync().Result;
 
                         //add it to the existing list
-                        batchStatusList.batches.AddRange(JObject.Parse(pagedResult).ToObject<Batch<BatchStatus>>().batches);
+                        batchStatusList.batches.AddRange(JObject.Parse(pagedResult).ToObject<Batch<T>>().batches);
 
                     }
 
@@ -76,12 +76,12 @@ namespace MailChimp.Services
         /// </summary>
         /// <param name="batchId"></param>
         /// <returns></returns>
-        public BatchStatus GetStatus(string batchId)
+        public T GetStatus(string batchId)
         {
 
             var result = httpClient.GetAsync(string.Concat(batchApiUri, "/" , batchId)).Result.Content.ReadAsStringAsync().Result;
 
-            BatchStatus batchStatus = JObject.Parse(result).ToObject<BatchStatus>();
+            T batchStatus = JObject.Parse(result).ToObject<T>();
 
             return batchStatus;
         }

@@ -5,6 +5,9 @@ With Batch Operation, all that is needed is to put a request in a batch, wait fo
 
 Recently Batch Operation API supports WebHooks to notify a client a batch is completed. This is super useful avoiding the need to periodically manually (programmatically) check if a batch is completed.
 
+Here is more on the Batch Operation API:
+https://developer.mailchimp.com/documentation/mailchimp/guides/how-to-use-batch-operations/
+
 Below is a sample code to show the usage of this project. I'll add support for more items as I continue to expolore the API.
 ```C#
         static void Main(string[] args)
